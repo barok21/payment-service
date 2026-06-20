@@ -27,7 +27,6 @@ export interface ApplyPaymentSuccess {
   message: string
   receipt: ExtractedReceipt
   matched_months: MatchedMonth[]
-  payer_matched: boolean
 }
 
 export interface ApplyPaymentError {
@@ -36,22 +35,6 @@ export interface ApplyPaymentError {
 }
 
 export type ApplyPaymentResult = ApplyPaymentSuccess | ApplyPaymentError
-
-function namesMatch(payerName: string | null, memberFullName: string | null): boolean {
-  if (!payerName || !memberFullName) return false
-  const payerWords = new Set(
-    payerName.toLowerCase().match(/\w+/g)?.filter(w => w.length > 1) || []
-  )
-  const memberWords = new Set(
-    memberFullName.toLowerCase().match(/\w+/g)?.filter(w => w.length > 1) || []
-  )
-  if (payerWords.size === 0 || memberWords.size === 0) return false
-  let overlap = 0
-  for (const w of payerWords) {
-    if (memberWords.has(w)) overlap++
-  }
-  return overlap >= 1
-}
 
 async function extractReceipt(bank: string, url: string): Promise<ExtractedReceipt> {
   const response = await fetch(`${RECEIPT_VERIFIER_URL}/extract`, {
@@ -101,16 +84,7 @@ export async function applyPayment(
   if (memberError) return { success: false, error: `Database error: ${memberError.message}` }
   if (!member) return { success: false, error: 'Member not found' }
 
-  // 3. Cross-check payer name
-  const payerMatched = namesMatch(receipt.payer_name, member.full_name)
-  if (!payerMatched) {
-    return {
-      success: false,
-      error: `Receipt payer name '${receipt.payer_name}' does not match your name '${member.full_name}'. This receipt belongs to someone else.`,
-    }
-  }
-
-  // 4. Check for duplicate reference
+  // 3. Check for duplicate reference
   const ref = receipt.reference
   if (ref) {
     const { data: dup } = await supabase
@@ -255,6 +229,5 @@ export async function applyPayment(
     message: `Payment applied: ${matchedMonths.length} month(s) covered.`,
     receipt,
     matched_months: matchedMonths,
-    payer_matched: true,
   }
 }
