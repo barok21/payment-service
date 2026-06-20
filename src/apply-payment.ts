@@ -84,18 +84,15 @@ export async function applyPayment(
   if (memberError) return { success: false, error: `Database error: ${memberError.message}` }
   if (!member) return { success: false, error: 'Member not found' }
 
-  // 3. Check for duplicate reference
-  const ref = receipt.reference
-  if (ref) {
-    const { data: dup } = await supabase
-      .from('payment_declarations')
-      .select('id')
-      .eq('reference_number', ref)
-      .maybeSingle()
+  // 3. Check for duplicate receipt URL
+  const { data: dup } = await supabase
+    .from('payment_declarations')
+    .select('id')
+    .eq('receipt_url', input.receipt_url)
+    .maybeSingle()
 
-    if (dup) {
-      return { success: false, error: `This receipt (ref: ${ref}) has already been used to make a payment.` }
-    }
+  if (dup) {
+    return { success: false, error: 'This receipt has already been used to make a payment.' }
   }
 
   // 5. Fetch enrollments
@@ -193,7 +190,7 @@ export async function applyPayment(
     payment_method: 'receipt-verified',
     payment_for_month: mm.month,
     payment_for_year: mm.year,
-    reference_number: ref || input.receipt_url,
+    reference_number: input.receipt_url,
     type: 'membership',
     status: 'approved',
     receipt_verified: true,
@@ -207,7 +204,7 @@ export async function applyPayment(
     amount: mm.amount,
     payment_for_month: mm.month,
     payment_for_year: mm.year,
-    reference_number: ref || input.receipt_url,
+    reference_number: input.receipt_url,
     type: 'membership',
     payment_date: nowIso,
   }))
